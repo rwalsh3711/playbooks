@@ -1,0 +1,51 @@
+---
+- name: Modify vm.swappiness to {{ desired_vm_swappiness}} on RHEL 6/7 servers
+  hosts: all
+  become: true
+  vars:
+    desired_vm_swappiness: 0
+
+  tasks:
+    - name: Remove any previous vm.swappiness settings in sysctl.conf
+      lineinfile:
+        path: /etc/sysctl.conf
+        regexp: '^vm.swappiness'
+        state: absent
+
+    - name: Additional check for vm.swappiness setting in RHEL 7
+      raw: find /etc/sysctl.d -type f -name "*.conf"
+      register: sysctl_dir
+      changed_when: false
+
+    - name: Remove vm.swappiness settings in /etc/sysctl.d dir on RHEL 7
+      lineinfile:
+        path: "{{ item }}"
+        regexp: '^vm.swappiness'
+        state: absent
+      with_items: "{{ sysctl_dir.stdout_lines }}"
+
+    - name: Modify vm.swappiness to {{ desired_vm_swappiness }} on RHEL 6
+      sysctl:
+        name: vm.swappiness
+        value: "{{ desired_vm_swappiness }}"
+        state: present
+        reload: yes
+      when: (ansible_distribution == "RedHat" and ansible_distribution_major_version  == '6')
+      notify: reload_sysctl6
+
+    - name: Modify vm.swappiness to {{ desired_vm_swappiness }} on RHEL 7
+      copy:
+        dest: /etc/sysctl.d/vm_swappiness.conf
+        content: "vm.swappiness = {{ desired_vm_swappiness }}\n"
+        owner: root
+        group: root
+        mode: 0644
+      when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '7')
+      notify: reload_sysctl7
+
+  handlers:
+    - name: reload_sysctl7
+      command: sysctl -p /etc/sysctl.d/vm_swappiness.conf
+
+    - name: reload_sysctl6
+      command: sysctl -p /etc/sysctl.conf

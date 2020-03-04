@@ -1,0 +1,28 @@
+---
+- name: Collect network data
+  hosts: all
+  vars:
+    logfile: "/tmp/output.txt"
+    email_address: "richard_walsh@optum.com"
+
+  tasks:
+    - local_action: lineinfile line="{{ ansible_hostname }} {{ item }} duplex is {{ ohai_network['interfaces'][item]['duplex'] | default('not_defined') }} and link speed is {{ ohai_network['interfaces'][item]['link_speed'] | default('not_defined') }}" dest="{{ logfile }}" create=yes
+      when: 
+        - item is search('^ens') or item is search('^eth')
+      with_items: "{{ ansible_interfaces }}"
+      become: false
+      changed_when: false
+
+    - name: Email results
+      mail:
+        subject: "Network data details from playbook run"
+        to: "{{ email_address }}"
+        body: "Results attached"
+        attach: "{{ logfile }}"
+      delegate_to: 172.17.0.1
+
+    - name: Cleanup temp file
+      file:
+        path: "{{ logfile }}"
+        state: absent
+      delegate_to: localhost

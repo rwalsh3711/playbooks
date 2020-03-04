@@ -1,0 +1,14 @@
+---
+- name: rebuild_grub2
+  raw: if [ -f /boot/efi/EFI/redhat/grub.cfg ]; then grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg; else grub2-mkconfig -o /boot/grub2/grub.cfg; fi
+  when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '7')
+
+- name: sd_sched_mod
+  shell: echo "{{ sched_type }}" > "{{ item }}"/queue/scheduler
+  with_items: "{{ all_luns.stdout_lines }}"
+
+- name: reload_sysctl7
+  command: sysctl -p /etc/sysctl.d/vm_swappiness.conf
+
+- name: reload_sysctl6
+  command: sysctl -p /etc/sysctl.conf

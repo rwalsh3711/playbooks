@@ -1,0 +1,7 @@
+---
+- name: Collect system facts
+  hosts: all
+  
+  tasks:
+    - name: Ping host
+      cmd: ping -c 3 webrd1488.uhc.com

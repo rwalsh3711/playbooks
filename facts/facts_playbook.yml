@@ -1,0 +1,11 @@
+---
+- name: Collect system facts
+  hosts: all
+  
+  tasks:
+    - name: Print some facts
+      debug:
+        msg: |
+          Hostname: {{ ansible_fqdn }}
+          System OS: {{ ansible_distribution }}
+          Version: {{ ansible_distribution_version }}

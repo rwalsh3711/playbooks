@@ -1,0 +1,62 @@
+---
+- name: Remove any previous vm.swappiness settings in sysctl.conf
+  lineinfile:
+    path: /etc/sysctl.conf
+    regexp: '^vm.swappiness'
+    state: absent
+
+- name: Additional check for vm.swappiness setting in RHEL 7
+  raw: find /etc/sysctl.d -type f -name "*.conf"
+  register: sysctl_dir
+  changed_when: false
+
+- name: Remove vm.swappiness settings in /etc/sysctl.d dir on RHEL 7
+  lineinfile:
+    path: "{{ item }}"
+    regexp: '^vm.swappiness'
+    state: absent
+  with_items: "{{ sysctl_dir.stdout_lines }}"
+
+- name: Modify vm.swappiness to {{ desired_vm_swappiness }} on RHEL 6
+  sysctl:
+    name: vm.swappiness
+    value: "{{ desired_vm_swappiness }}"
+    state: present
+    reload: yes
+  when: (ansible_distribution == "RedHat" and ansible_distribution_major_version  == '6')
+  notify: reload_sysctl6
+
+- name: Modify vm.swappiness to {{ desired_vm_swappiness }} on RHEL 7
+  copy:
+    dest: /etc/sysctl.d/vm_swappiness.conf
+    content: "vm.swappiness = {{ desired_vm_swappiness }}\n"
+    owner: root
+    group: root
+    mode: 0644
+  when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '7')
+  notify: reload_sysctl7
+
+- name: Change scheduler type to {{ sched_type }} on RHEL 6
+  replace:
+    path: /boot/grub/grub.cfg
+    regexp: "elevator=[a-z]+"
+    replace: "elevator={{ sched_type }}"
+    backup: yes
+  when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '6')
+  notify: sd_sched_mod
+   
+- name: Change scheduler type to {{ sched_type }} on RHEL 7
+  replace:
+    path: /etc/default/grub
+    regexp: "elevator=[a-z]+"
+    replace: "elevator={{ sched_type }}"
+    backup: yes
+  when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '7')
+  notify: 
+    - rebuild_grub2
+    - sd_sched_mod
+
+- name: Collect all configured LUN names
+  raw: find /sys/block -type l -name "sd*"
+  register: all_luns
+  changed_when: false

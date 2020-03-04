@@ -1,0 +1,11 @@
+---
+- name: Collect network data
+  hosts: all
+
+  tasks:
+    - name: Print interface speed and duplex
+      debug:
+        msg: "{{ ansible_hostname }} {{ item }} duplex is {{ ohai_network['interfaces'][item]['duplex'] | default('not_defined') }} and link speed is {{ ohai_network['interfaces'][item]['link_speed'] | default('not_defined') }}"
+      with_items: "{{ ansible_interfaces }}"
+      when: 
+        - item is search('^ens') or item is search('^eth')

@@ -1,0 +1,26 @@
+---
+- name: Remove graphical boot and quiet from grub in RHEL 6/7
+  hosts: all
+
+  tasks:
+    
+    - name: Apply fix for RHEL6
+      replace:
+        path: "/boot/grub/grub.conf"
+        backup: yes
+        regexp: '\squiet|\srhgb'
+      when: (ansible_distribution == "RedHat" and ansible_distribution_major_version  == '6')
+
+    - name: Apply fix for RHEL7
+      replace:
+        path: "/etc/default/grub"
+        backup: yes
+        regexp: '\squiet|\srhgb'
+      when:  (ansible_distribution == "RedHat" and ansible_distribution_major_version  == '7')
+      notify: rebuild_grub2
+
+  handlers:
+
+    - name: rebuild_grub2
+      raw: if [ -f /boot/efi/EFI/redhat/grub.cfg ]; then grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg; else grub2-mkconfig -o /boot/grub2/grub.cfg; fi
+      when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '7')

@@ -1,0 +1,41 @@
+---
+- name: Playbook to modify the I/O scheduler to {{ sched_type }} on RHEL 6 or 7
+  hosts: all
+  become: true
+  vars:
+    sched_type: noop
+
+  tasks:
+    - name: Change scheduler type to {{ sched_type }} on RHEL 6
+      replace:
+        path: /boot/grub/grub.cfg
+        regexp: "elevator=[a-z]+"
+        replace: "elevator={{ sched_type }}"
+        backup: yes
+      when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '6')
+      notify: sd_sched_mod
+       
+    - name: Change scheduler type to {{ sched_type }} on RHEL 7
+      replace:
+        path: /etc/default/grub
+        regexp: "elevator=[a-z]+"
+        replace: "elevator={{ sched_type }}"
+        backup: yes
+      when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '7')
+      notify: 
+        - rebuild_grub2
+        - sd_sched_mod
+
+    - name: Collect all configured LUN names
+      raw: find /sys/block -type l -name "sd*"
+      register: all_luns
+      changed_when: false
+
+  handlers:
+    - name: rebuild_grub2
+      raw: if [ -f /boot/efi/EFI/redhat/grub.cfg ]; then grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg; else grub2-mkconfig -o /boot/grub2/grub.cfg; fi
+      when: (ansible_distribution == "RedHat" and ansible_distribution_major_version == '7')
+
+    - name: sd_sched_mod
+      shell: echo "{{ sched_type }}" > "{{ item }}"/queue/scheduler
+      with_items: "{{ all_luns.stdout_lines }}"
